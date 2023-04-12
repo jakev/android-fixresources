@@ -1,19 +1,5 @@
 #!/usr/bin/env python
 
-# DTF Core Content
-# Copyright 2013-2016 Jake Valletta (@jake_valletta)
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
 """Resolve resource values in Smali files"""
 from lxml import etree
 import os
@@ -33,18 +19,10 @@ SMALI_FILES_PATH = "/smali"
 CONST_REGEX = re.compile("const[ \/\-].*0x[a-fA-F0-9]{4,8}$")
 PACKED_SWITCH_REGEX = re.compile("\.packed-switch 0x[a-fA-F0-9]{4,8}$")
 
-TAG = 'fixresources'
-
 
 class fixresources():
 
     """Module class for resolving resources"""
-
-    about = 'Resolve resource values in Smali files.'
-    author = 'Jake Valletta (jakev) and Adin Drabkin (adindrabkin)'
-    health = 'beta'
-    name = 'fixresources'
-    version = '1.0.0'
 
     public_dict = {}
     has_strings = False
