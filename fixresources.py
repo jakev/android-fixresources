@@ -1,10 +1,29 @@
 #!/usr/bin/env python
 
+# DTF Core Content
+# Copyright 2013-2016 Jake Valletta (@jake_valletta)
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 """Resolve resource values in Smali files"""
 from lxml import etree
 import os
 import os.path
 import re
+import click
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 
 DISPLAY_LEN = 25
 PUBLIC_FILE_PATH = "/res/values/public.xml"
@@ -16,34 +35,32 @@ PACKED_SWITCH_REGEX = re.compile("\.packed-switch 0x[a-fA-F0-9]{4,8}$")
 
 TAG = 'fixresources'
 
-class fixresources(object):
+
+class fixresources():
+
+    """Module class for resolving resources"""
+
+    about = 'Resolve resource values in Smali files.'
+    author = 'Jake Valletta (jakev) and Adin Drabkin (adindrabkin)'
+    health = 'beta'
+    name = 'fixresources'
+    version = '1.0.0'
 
     public_dict = {}
     has_strings = False
 
-    def usage(self):
-
-        """Module usage"""
-
-        print "fixresources v%s" % self.version
-        print ""
-        print "Usage: fixresources [decoded_app_dir]"
-        print ""
-
-        return 0
 
     def do_parse_public(self, project_dir):
 
         """Parse public.xml file"""
 
-        public_file_path = "%s/%s" % (project_dir, PUBLIC_FILE_PATH)
+        public_file_path = f"{project_dir}/{PUBLIC_FILE_PATH}"
 
         if not os.path.isfile(public_file_path):
-            log.e(TAG, "'%s' public resource file not found!"
-                                                % public_file_path)
+            logging.error(f"'{public_file_path}' public resource file not found!")
             return -1
 
-        log.i(TAG, "Parsing public.xml...")
+        logging.info("Parsing public.xml...")
 
         for _, element in etree.iterparse(public_file_path):
             if element.tag == "public":
@@ -51,7 +68,7 @@ class fixresources(object):
                 try:
                     res_id = element.attrib['id']
 
-                    log.d(TAG, "Adding new public resource value %s" % (res_id))
+                    logging.debug(f"Adding new public resource value {res_id}")
                     self.public_dict[int(res_id, 16)] = [element.attrib['name'],
                                                         element.attrib['type']]
 
@@ -59,7 +76,7 @@ class fixresources(object):
                         self.has_strings = True
 
                 except KeyError:
-                    log.w(TAG, "KeyError iterating public.xml, skipping!")
+                    logging.warning("KeyError iterating public.xml, skipping!")
 
             # Clear the element from memory
             element.clear()
@@ -70,13 +87,13 @@ class fixresources(object):
 
         """Parse strings.xml file"""
 
-        string_file_path = "%s/%s" % (project_dir, STRING_FILE_PATH)
+        string_file_path = f"{project_dir}/{STRING_FILE_PATH}"
 
         if not os.path.isfile(string_file_path):
-            log.e(TAG, "'%s' public resource file not found!")
+            logging.error(f"'{string_file_path}' public resource file not found!")
             return -1
 
-        log.i(TAG, "Parsing strings.xml...")
+        logging.info("Parsing strings.xml...")
 
         for _, element in etree.iterparse(string_file_path):
 
@@ -87,12 +104,11 @@ class fixresources(object):
                     for pub in self.public_dict.keys():
                         if (self.public_dict[pub][0] == string_name and
                                         self.public_dict[pub][1] == "string"):
-                            log.d(TAG, "Adding string details to %s (0x%08x)"
-                                                        % (string_name, pub))
+                            logging.debug(f"Adding string details to {string_name} (0x{pub})")
                             self.public_dict[pub].append(element.text)
 
                 except KeyError:
-                    log.w(TAG, "KeyError iterating strings.xml, skipping!")
+                    logging.warning("KeyError iterating strings.xml, skipping!")
 
             # Clear the element from memory
             element.clear()
@@ -103,13 +119,13 @@ class fixresources(object):
 
         """Do smali changes"""
 
-        smali_files_dir = "%s/%s" % (project_dir, SMALI_FILES_PATH)
+        smali_files_dir = f"{project_dir}/{SMALI_FILES_PATH}"
 
         if not os.path.isdir(smali_files_dir):
-            log.e(TAG, "Smali files directory does not exist!")
+            logging.error("Smali files directory does not exist!")
             return -2
 
-        log.i(TAG, "Making modifications to files in smali/*...")
+        logging.info("Making modifications to files in smali/*...")
 
         for root, dirs, files in os.walk(smali_files_dir):
 
@@ -145,20 +161,17 @@ class fixresources(object):
 
                 # Determine if this is a value in our list
                 if res_value_int in self.public_dict.keys():
-                    log.d(TAG, "We found a resource identifier: %s [%s]"
-                                                    % (res_value, file_path))
+                    logging.debug(f"We found a resource identifier: res_value [file_path]")
+                                                   
 
                     line_len = len(line)
-                    line += ("\t#Public value '%s' (type=%s)"
-                                    % (self.public_dict[res_value_int][0],
-                                       self.public_dict[res_value_int][1]))
+                    line += (f"\t#Public value '{self.public_dict[res_value_int][0]}' (type={self.public_dict[res_value_int][1]})")
 
                     if len(self.public_dict[res_value_int]) == 3:
                         string_value = self.public_dict[res_value_int][2]
 
                         if string_value is None:
-                            log.w(TAG, "String value for value %s not found!"
-                                                                % res_value)
+                            logging.warn(f"String value for value {res_value} not found!")
                             continue
 
                         formatted_string_value = (string_value[0:DISPLAY_LEN]
@@ -166,10 +179,7 @@ class fixresources(object):
                                         else ""))
 
 
-                        line += ("\n%s\t#%s = '%s'"
-                                % (" " * line_len,
-                                self.public_dict[res_value_int][0],
-                                formatted_string_value))
+                        line += (f"\n{' ' * line_len}\t#{self.public_dict[res_value_int][0]} = '{formatted_string_value}'")
 
                     file_modded = True
 
@@ -181,12 +191,10 @@ class fixresources(object):
 
                 # Determine if this is a value in our list
                 if res_value_int in self.public_dict.keys():
-                    log.d(TAG, "Found packed-switch resource identifier: %s"
-                                                                % res_value)
+                    logging.debug(f"Found packed-switch resource identifier: {res_value}")
 
-                    line += ("\t#Public value '%s' (type=%s)"
-                                    % (self.public_dict[res_value_int][0],
-                                    self.public_dict[res_value_int][1]))
+
+                    line += f"\t#Public value '{self.public_dict[res_value_int][0]}' (type={self.public_dict[res_value_int][1]})"
 
                     file_modded = True
 
@@ -196,23 +204,22 @@ class fixresources(object):
         # Write the changes out.
         if file_modded == True:
             output = open(file_path, 'w')
-            output.write(data.encode('utf-8'))
-            log.d(TAG, "Changes applied to file '%s'" % (file_path))
+            output.write(data)
+            logging.debug(f"Changes applied to file '{file_path}'")
             output.close()
         else:
-            log.d(TAG, "No changes to file '%s'" % (file_path))
+            logging.debug(f"No changes to file '{file_path}'")
 
         return 0
 
-    def do_fix(self, args):
+    def do_fix(self, decoded_app_dir):
 
         """Do fix resources"""
 
-        arg_app_dir = args.pop()
+        arg_app_dir = decoded_app_dir
 
         if not os.path.isdir(arg_app_dir):
-            log.e(TAG, "Application directory '%s' doesnt exist!"
-                                                        % arg_app_dir)
+            logging.error(f"Application directory '{arg_app_dir}' doesnt exist!")
             return -1
 
         self.has_strings = False
@@ -231,15 +238,25 @@ class fixresources(object):
         if self.do_changes(arg_app_dir) != 0:
             return -4
 
-        log.i(TAG, "Process complete!")
+        logging.info("Process complete!")
 
 
-    def execute(self, args):
+    def execute(self, decoded_app_dir):
 
         """Main class execution"""
 
-        if len(args) != 1:
-            self.usage()
-            return -1
+        return self.do_fix(decoded_app_dir)
 
-        return self.do_fix(args)
+@click.command()
+@click.argument("decoded_app_dir", type=click.Path(exists=True))
+def main(decoded_app_dir):
+    """
+    Usage: fixresources [decoded_app_dir]
+    """
+
+    _fixresources = fixresources()
+    _fixresources.execute(decoded_app_dir) 
+
+
+if __name__ == '__main__':
+    main()
